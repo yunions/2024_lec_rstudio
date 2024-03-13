@@ -10,20 +10,99 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## HW2
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### example 1
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r example1}
+sqrt(2); exp(5); log10(20); log(20)
+gamma(5); abs(-4.5); round(pi,digits = 2)
 ```
 
-## Including Plots
+### example 2
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r example2}
+dnorm(5, mean = 5, sd = 1)
+dexp(x = 1, rate=5)
+dweibull(x = 50, shape = 80, scale = 1.5)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+### example 3
+
+```{r example3}
+a=5;b=6
+print(2*a+b^2)
+print(exp(5)*3^b)
+
+rm(list=ls())
+```
+
+
+### example 4
+
+```{r example4}
+norm.dist <- function(x,m,s){
+  
+  value <- 1/(s*sqrt(2*pi))*exp(-((x-m)^2)/(2*s^2))
+
+  return(10*value)
+}
+
+norm.dist(10,5,1)
+
+```
+
+### example 5
+
+```{r example5}
+sum(seq(1,100)^2)
+prod(seq(1,10))
+sum(cos(seq(1,20)/20*pi))
+```
+
+
+### example 6
+```{r example6}
+mat <- matrix(seq(1,9)*2, nrow = 3, ncol = 3)
+dimnames(mat)[[1]] <- c("A","B","C")
+dimnames(mat)[[2]] <- c("일","이","삼")
+mat; mat[3,2]
+```
+
+### example 7
+
+loading iris data
+
+```{r example7}
+data("iris")
+
+iris[c(iris$Species=='virginica'),]
+```
+
+### example 8
+
+```{r example8}
+petal.len <- iris[,3]
+petal.spc <- iris$Species
+
+list(petal.len,petal.spc)
+
+```
+
+### example 9
+
+```{r example9}
+print.spc <- function(x){
+  for(i in 1:length(x)){
+    if(x[i] == 'setosa'){
+      print(1)
+    }else if(x[i] == 'versicolor'){
+      print(2)
+    }else{
+      print(3)
+    }
+  }
+}
+
+print.spc(iris$Species)
+```
+
+
