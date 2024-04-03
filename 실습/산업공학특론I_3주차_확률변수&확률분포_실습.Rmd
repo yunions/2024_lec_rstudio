@@ -148,6 +148,7 @@ lapply(dat_target,summary)
 
 
 # 관측 변수 기반 유형별 경험적 밀도/누적분포 시각화 함수 정의
+# -> 데이터기반의 밀도함수로 모집단을 설명하기 위해서를 추가적인 분포 적합 필요
 dens <- function(x){
   par(mfrow=c(length(x),2))
   for (i in 1:length(x)){
@@ -182,9 +183,9 @@ fit <- function(x){
     print( paste(names(x)[i],'그룹에 대한 추정을 시작합니다.') )
 
     # 추정 파라미터와 로그우도값을 추정한 결과를 정리할 틀 생성
-    result <- matrix(nrow=3, ncol=length(fitlist))
+    result <- matrix(nrow=4, ncol=length(fitlist))
     colnames(result) <- fitlist
-    row.names(result) <- c('par1','par2','loglike')
+    row.names(result) <- c('par1','par2','loglike', 'AIC')
 
     # 지정한 후보 확률분포를 각각 추정하여 결과를 틀에 입력
     for (j in 1:length(fitlist)){
@@ -194,7 +195,8 @@ fit <- function(x){
       if (length(est)==1){ est <- c(est,NA)}
       
       ll <- fit_temp$loglik
-      result[,j] <- c(est, ll)
+      AIC <- fit_temp$aic
+      result[,j] <- c(est, ll, AIC)
     }
     print(result) # 결과 출력
     
