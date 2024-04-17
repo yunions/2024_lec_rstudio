@@ -226,8 +226,9 @@ prop.test(np, ndat, p=0.5, alternative = 'less')
 # 독립적인 두 표본에 대한 검정
 ### H0: 흡연여부와 관계없이 15,000원 넘게 보험료를 내는 비율은 동일하다.
 ### H1: 흡연자/비흡연자 간 15,000원 넘게 보험료를 내는 비율이 상이하다.
-
-
+ndat <- sapply(dat_smoke, length)
+np <- sapply(dat_smoke, function(x){ sum(x>15000) })
+prop.test(np, ndat)
 ```
 
 #### 3-4. 분할표 검정

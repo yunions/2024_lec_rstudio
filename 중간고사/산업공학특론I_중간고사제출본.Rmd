@@ -1,0 +1,418 @@
+---
+title: "산업공학특론I_중간고사"
+author: "김윤희 (2021118105)"
+date: "4/10/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=12)
+```
+
+<br>
+<br>
+<br>
+
+### [중간고사 개요]
+
+<br>
+
+#### 1. 중간고사 답안 작성 및 제출 요령
+
+* 모든 답안 도출 과정은 R 코드로 작성되어야 하며, 코드에는 분석 과정을 식별할 수 있도록 주석(#)으로 설명이 작성되어야 한다. (R 코드 없이 답만 적는 경우 오답 처리)
+
+* 수강생 간 코드를 공유하거나 동일하게 작성하는 행위를 금지한다. (적발 시 진실의 방 소환 및 모두 0점으로 성적 반영)
+
+* 특정한 문제에 대한 답안은 해당 문항에 대한 코드에 작성되어야 한다. (1번 문항에 대한 답을 2번 문항에 적는 경우 오답 처리)
+
+* 답안은 Rmd 확장자로 보고서 제작이 가능하도록 제출하는 것을 원칙으로 하나, Markdown 실행이 어려운 경우 R 스크립트로 작성하되 채점이 가능하도록 문항 별로 스크립트를 작성하여야 한다. 
+
+* 중간고사 답안은 4월 10일 23시 59분까지 온라인 강의실 내 과제 및 평가 - 중간고사 탭에 제출하여야 하며, 4월 11일 자정 이후에는 제출이 불가하다. (이후 다른 경로를 통하여 제출 시 총점의 50%로 성적 반영)
+
+<br>
+<br>
+
+#### 2. 데이터 설명
+
+어느 의류 생산 공정에서는 재봉 (sewing), 마감 (finishing)으로 부서를 구성하여 공정을 운영하고 있으며,
+공정의 생산성을 개선하기 위해 일별 공정 작업 관련 데이터를 수집하여 생산성에 영향을 미치는 요인을 분석하고자 한다.
+데이터 분석에 활용하는 변수의 정보는 다음과 같다.
+
+* date: 집계 날짜
+* quarter: 한 달을 나눈 분기 (주)
+* department: 부서
+* day: 요일
+* team: 부서별 투입 인원 수
+* targeted_productivity: 당초에 목표한 생산성 점수
+* over_time: 초과근무 (분)
+* incentive: 성과급
+* actual_productivity: 실제 생산성 점수
+
+<br>
+
+상기에 기술된 작성요령과 데이터를 기반으로 주어진 문제에 대한 분석 과정과 그에 따른 답안을 기술하시오.
+
+
+<br>
+<br>
+<br>
+
+
+### [중간고사 문항]
+
+<br>
+
+#### 1. 주어진 데이터에서 데이터 탐색 (EDA) 및 전처리를 수행하고, 결과를 시각화하시오. (10점)
+
+* 활용하지 않는 변수 (date, smv, wip, idle_time, idle_men, no_of_style_change, no_of_workers)는 삭제할 것
+* 시각화 시 범주형 변수는 막대그래프로, 연속형 변수는 히스토그램으로 표현할 것
+
+```{r no_1}
+# 사용할 데이터 입력
+dat <- read.csv("산업공학특론I_중간고사 데이터.csv")
+
+# 활용하지 않는 변수 삭제
+column_name <- c("date", "smv", "wip", "idle_time", "idle_men", "no_of_style_change", "no_of_workers")
+dat <- subset(dat, select = setdiff(names(dat), column_name))
+
+# 범주형 변수로 변경(분기, 요일, 부서)
+dat$quarter <- as.factor(dat$quarter)
+# 부서의 경우, 마감파트의 전처리가 필요하여 전처리 과정 추가
+dat$department <- ifelse(dat$department == 'sweing', 'sweing', 'finishing')
+dat$department <- as.factor(dat$department)
+dat$day <- as.factor(dat$day)
+
+summary(dat)
+
+# 범주형은 막대로, 연속형은 히스토그램으로 시각화 함수 선언
+visualize <- function(x,main){
+  if (is.factor(x)){
+    barplot(table(x), col='grey', main=main, las=2)
+  }else{
+    hist(x, col='grey', main=main, xlab='')
+    }
+}
+
+# 4행 2열 배치로 시각화 진행
+par(mfrow=c(4,2)) 
+for (i in 1:ncol(dat)){
+  visualize(x=dat[,i], main=colnames(dat)[i])
+  }
+```
+
+<br>
+<br>
+
+#### 2. 실제 생산성 점수 (actual_productivity)가 어떠한 분포를 따르는지 규명하기 위하여 여러 분포에 대한 MLE를 추정 및 비교하고, 최적 분포를 도출하시오. (15점)
+
+* 여러 분포 (최소 2개 이상)에 대하여 MLE를 통하여 모수를 추정할 것
+* 분포별 추정 결과 비교 시 적합도 평가 지표를 활용할 것
+* 추정 결과에 따른 최적 분포를 도출하고, 그 근거를 제시할 것
+
+```{r no_2}
+library(fitdistrplus)
+
+# 확률분포 추정 함수 정의
+fit <- function(x){
+  
+  # 후보 확률분포 정의
+  fitlist <- c('exp','gamma','norm','weibull','lnorm')
+
+  # 추정 파라미터와 로그우도값을 추정한 결과를 정리할 틀 생성
+  result <- matrix(nrow=4, ncol=length(fitlist))
+  colnames(result) <- fitlist
+  row.names(result) <- c('par1','par2','loglike', 'AIC')
+
+  # 지정한 후보 확률분포를 각각 추정하여 결과를 틀에 입력
+  for (i in 1:length(fitlist)){
+    # 각 분포 적합은 MLE를 기반으로 적합 진행
+    fit_temp <- fitdist(x, fitlist[i], method="mle")
+    print(fit_temp)
+    est <- fit_temp$estimate
+    if (length(est)==1){est <- c(est,NA)}
+    
+    ll <- fit_temp$loglik
+    AIC <- fit_temp$aic
+    result[,i] <- c(est, ll, AIC)
+  }
+  print('########################################################') # 결과 출력
+  print(result) # 결과 출력
+    
+  # 로그우도값이 가장 큰 확률분포를 적합 분포로 선정하여 출력
+  best <- colnames(result)[which.max(result[3,])]
+  print(paste(names(x),'최적 분포는 ', best,'입니다.'))
+  plot(fitdist(x, best))
+  return(result)
+}
+
+result <- fit(dat$actual_productivity)
+result
+```
+
+<br>
+<br>
+
+#### 3. 2. 에서 도출된 최적 분포를 기준으로 MLE 추정 결과를 시각화하고 이를 해석하시오. (10점)
+
+* 시각화의 경우 실제 데이터의 분포와 MLE를 모수로 가지는 분포의 비교가 가능하도록 도시할 것
+* 단순 도시가 아닌 도시 결과에 대한 해석 결과를 설명하고, 결론을 도출할 것
+
+```{r no_3}
+fitlist <- c('exp','gamma','norm','weibull','lnorm')
+color <- c('blue','green','black','red','orange')
+
+hist(dat$actual_productivity, col='grey', breaks = 10, main = 'Density of Actual Productivity', prob = T)
+curve(dexp(x, rate=result[1,1]), col=color[1], add=T)
+curve(dgamma(x, shape=result[1,2], rate=result[2,2]), col=color[2], add=T)
+curve(dnorm(x, mean=result[1,3], sd=result[2,3]), col=color[3], add=T)
+curve(dweibull(x, shape=result[1,4], scale=result[2,4]), col=color[4], add=T)
+curve(dlnorm(x, meanlog=result[1,5], sdlog=result[2,5]), col=color[5], add=T)
+legend('topright', legend = fitlist, col=color, lty=1)
+
+```
+
+* MLE 추정을 통해 산출된 추정 결과를 바탕으로 실제 데이터의 히스토그램과 개별 분포의 적합 결과를 도식하면 위와 같다.
+* 위의 결과를 통해, MLE 값이 가장 큰 weibull 분포가 실제 데이터와 가장 유사한 형태로 모사하고 있음을 확인할 수 있다.
+* 실제 생산성의 데이터 분포 경향성을 확인하면, 오른쪽으로 치우쳐져서 높게 올라가는 형태로 이 형태와 가장 유사한 곡선은 와이블분포이다.
+* 또한, 중심경향성과 양쪽 극단 또한 다른 분포들 대비 와이블분포가 가장 유사하게 모사하고 있다는 것을 확인할 수 있다.
+
+
+<br>
+<br>
+
+#### 4. 주차 (quarter), 부서 (department), 요일 (day) 별로 목표하는 점수 (targeted_productivity), 실제 생산성 점수 (actual_productivity)에 차이가 없는지 그룹화를 수행하고 각 점수에 대해 기술통계량을 검토하시오. (10점)
+
+* 기술통계량은 목표 점수, 실제 점수 모두 검토할 것
+* 기술통계량 검토 결과를 해석하여 본인의 생각과 결론을 글로 작성할 것
+
+```{r no_4}
+
+column_name <- c("quarter","department","day")
+
+# 주차, 부서, 요일의 각 그룹마다 실제 점수와 목표 점수의 차이 검터
+# 점수 차이를 검정하기 위해서, 각 그룹마다 실제 점수 및 목표 점수의 평균, 최대, 최소 산출하여 차이 검토
+
+grp_summary <- function(grp) {
+  # (1) 그룹으로 데이터 분할
+  split_data <- split(dat, dat[grp])
+  
+  mean_test <- function(data) {
+    actual_mean <- mean(data$actual_productivity)
+    target_mean <- mean(data$targeted_productivity)
+    # (2) 평균 실제 점수와 평균 목표 점수의 차이 산출
+    mean_diff <- actual_mean - target_mean
+    
+    # (3) 최소, 최대 산출
+    actual_min <- min(data$actual_productivity)
+    target_min <- min(data$targeted_productivity)
+    actual_max <- max(data$actual_productivity)
+    target_max <- max(data$targeted_productivity)
+    
+    # (4) 미달성 및 초과달성 산출
+    diff_min <- min(data$actual_productivity - data$targeted_productivity)
+    diff_max <- max(data$actual_productivity - data$targeted_productivity)
+    
+    # (5) 산출결과 저장
+    return(list(
+      actual_mean = actual_mean,
+      target_mean = target_mean,
+      mean_diff = mean_diff,
+      actual_min = actual_min,
+      target_min = target_min,
+      actual_max = actual_max,
+      target_max = target_max,
+      diff_min = diff_min,
+      diff_max = diff_max,
+      count = nrow(data)
+    ))
+  }
+  
+  # 분할된 데이터 마다 차이 산출 진행
+  results <- lapply(split_data, mean_test)
+
+  # 산출된 결과 저장
+  result_df <- do.call(rbind, results)
+  
+  #그룹 이름으로 열이름 변경
+  rownames(result_df) <- unique(dat[[grp]])  
+  print(result_df)
+}
+
+for (i in 1:(length(column_name))){
+  print(column_name[i])
+  grp_summary(i)
+}
+
+```
+##### 주기(한달을 나누는 분기)
+* 3주기와 4주기의 경우 평균 목표 생산성보다 평균 실제 생산성이 낮아 목표 달성하지 못했음을 확인할 수 있다.
+* 주기별 최대 목표 생산성의 목표는 0.8로 동일하며, 실제 최대 목표 생산성은 1이상으로 100% 이상 달성할 수 있음을 확인할 수 있다.
+* 1주기에서 5주기로 갈수록 근무일이 점차 적어진다는 것을 확인할 수 있다.
+* 1주기의 경우, 최소 목표 생산성이 0.07로 매우 낮아 최대-최소 생산성의 편차가 크며 상대적으로 다른 분기 근무횟수(360)가 많은 것을 확인할 수 있다.
+* 5주기의 경우, 최소 목표 생산성이 0.5로 다른 분기대비 높지만 상대적으로 근무횟수(44)가 적어 높은 생산성이 필요할때에 근무하는 것을 확인할 수 있다.
+* 실제로 5분기의 경우, 실제 생산성이 다른 분기 대비 높은 0.82로 많은 양을 생산함을 확인할 수 있다.
+* 각 분기별 미달성한 경우 중에서 2분기에서 가장 크게 미달성한 경우가 발생하였으며, 그 당시 목표 대비 실제 생산성이 -0.56으로 목표 달성하지 못했다.
+
+##### 부서
+* 마감 부서의 경우, 목표 생산성 대비 -0.001로 달성하지 못했으며, 재봉 부서 대비 많은 근무횟수(691)이 있다는 것을 확인할 수 있다.
+* 재봉 부서의 경우, 마감 부서 대비 미달성한 경우가 -0.56으로 크게 발생하였으며 이는 당시 목표 대비 실제 생산성이 -0.56으로 목표 달성하지 못했다.
+* 두 부서 모두, 최대 실제 생산성은 110% 이상으로 달성할 수 있음을 확인할 수 있다.
+* 두 부서 모두 최대 목표 생산성은 0.8이지만, 재봉의 경우 최소 목표 생산성은 0.35, 마감의 경우 최소 목표 생산성은 0.07로 차이가 있음을 확인할 수 있다.
+
+##### 요일
+* 7일 중 6일 생산하며, 토요일이 187로 근무횟수가 가장 적고 수요일이 208로 근무횟수가 가장 많으며 금요일은 휴일임을 확인할 수 있다.
+* 평균적으로 대부분의 요일에서 목표을 달성하였지만, 일요일의 경우 -0.008로 목표달성하지 못했음을 확인할 수 있다.
+* 일요일의 경우, 다들 날 대비 최소 목표가 0.5 높다는 것을 확인할 수 있다.
+
+<br>
+<br>
+
+#### 5. 부서 (department) 별로 실제 생산성 점수 (actual_productivity)의 분포에 차이가 있다고 볼 수 있는지 검정하고자 한다. 신뢰수준 99% 하에서 모평균, 모분산 가설검정을 수행하시오. (10점)
+
+* 가설검정을 수행할 때에는 5단계의 절차를 준용하여 코드 및 설명을 작성할 것
+* 모평균 검정 시 모분산은 알려지지 않았으며, 부서별 생산성 점수의 모분산은 다르다고 가정
+
+```{r no_5}
+library(nortest)
+
+# (1) 귀무가설 및 대립가설 설정
+# 귀무가설1 : 재봉부서 평균과 마감부서 평균이 동일
+# 귀무가설2 : 재봉부서 분산과 마감부서 분산이 동일
+# (2) 유의수준 설정 : 0.01으로 양측검정 진행
+
+# (3) 분포 및 기각역 설정
+# 앞서 진행한 분포의 경우, 와이블분포에 적합함을 확인
+# t.test 진행을 위해서는 정규성 검정 필요
+Normal.test <- function(data){
+  m <- mean(data$actual_productivity)
+  sd <- sd(data$actual_productivity)
+  data <- (data$actual_productivity - m)/sd
+  
+  print(ks.test(data, "pnorm"))
+  print(ad.test(data))
+}
+
+# 정규성 검정을 통과하지 못하므로 다른 검정 방식이 필요함을 확인
+split_data <- split(subset(dat, select = c("actual_productivity")), dat["department"])
+lapply(split_data, Normal.test)
+
+# But, 데이터의 크기가 충분히 크기 때문에 정규성을 가정할 수 있음
+# 정규성을 가정한 경우, 아래와 같은 결과를 만들 수 있음
+
+# [정규성 가정]
+# (3-1) 독립 표본 t 검정(H0 : 재봉과 마감의 생산성은 동일하다)
+# 정규분포 및 불등분산 가정 기반으로 t 검정 진행
+t.t.F <- t.test(split_data$finishing, split_data$sweing, var.equal=FALSE, conf.level=0.99)
+
+# (4-1) 검정통계량 계산
+# (5-1) 결과 도출 : p-value는 0.005(양측검정)보다 작으므로 귀무가설을 기각하여 두 평균이 다르다는 것을 확인
+print("두 분포의 평균 검정")
+print(paste('검정통계량 t_0 : ',t.t.F$statistic))
+print(paste('p-value = ',t.t.F$p.value))
+
+
+# (3-2) 독립 표본 F 검정(H0 : 재봉과 마감의 생산성은 다르다)
+# 정규분포 및 불등분산 가정 기반으로 t 검정 진행
+v.t <- var.test(unlist(split_data$finishing), unlist(split_data$sweing), conf.level = 0.99)
+
+# (4-1) 검정통계량 계산
+# (5-1) 결과 도출 : p-value는 0.005(양측검정)보다 작으므로 귀무가설을 기각하여 두 분산이 다르다는 것을 확인
+print("두 분포의 분산 검정")
+print(paste('검정통계량 F_0 : ',v.t$statistic))
+print(paste('p-value = ',v.t$p.value))
+
+```
+
+<br>
+<br>
+
+#### 6. 부서에 따라 목표 생산성 점수 (targeted_productivity) 대비 실제로 달성한 생산성 점수 (actual_productivity)를 초과하는 비율에 차이가 있는지 살펴보고자 한다. 부서 (department) 별로 목표량을 초과하여 생산이 이루어진 비율에 차이가 있는지 95% 신뢰수준 하에서 검정을 수행하고, 달성 비율 차이에 대한 신뢰구간을 산출하시오. (15점)
+
+* 부서별 전체 데이터 중 목표 생산성 점수가 실제 생산성 점수를 초과하는 비율이 같은지 비교할 것
+
+```{r no_6}
+# 목표 생산성 점수 대비 실제로 달성한 생산성 점수 비율을 부서별로 분할
+dat_prob <- split(dat$actual_productivity/dat$targeted_productivity,dat["department"])
+# 부할된 결과 중 1이상(목표량 초과 생산)의 경우의 비율의 차가 있는지 검정
+ndat <- sapply(dat_prob, length)
+np <- sapply(dat_prob, function(x){ sum(x>=1) })
+p.t <- prop.test(np, ndat, conf.level = 0.95)
+
+# 검정 결과에 따라, 매우 작은 p-value 값을 통하여 두 부서의 초과 생산 비율은 동일하지 않음을 확인
+print(paste('p-value : ', p.t$p.value))
+print(paste("신뢰구간: [", p.t$conf.int[1], ", ", p.t$conf.int[2], "]"))
+```
+
+<br>
+<br>
+
+#### 7. 생산 공정에 투입되는 인원 (team)이 요일 (day)에 관계없이 동일한지 검정하고자 한다. 신뢰수준 95%에서 가설검정을 수행하시오. (15점)
+
+* 요일별로 평균적인 투입 인원을 산출할 것
+* 실제 투입 인원이 요일에 관계없이 동일한 경우와 비교하여 가설검정을 수행할 것
+
+
+```{r no_7}
+# 두 평균을 산출하여 도수와 한 후 검정 진행
+dat_day <- split(dat$team, dat$day)
+day_sum <- lapply(dat_day, sum)
+day_count <- lapply(dat_day, length)
+# 기대 도수 산출(전체 평균 * 요일별 근무 횟수)
+day_exp <- rep(sum(dat$team)/(nrow(dat)), length(day_sum))
+day_exp <- day_exp*unlist(day_count)
+
+chi_squared_stat <- sum(((unlist(day_sum) - day_exp)^2) / day_exp)
+df <- length(day_sum) - 1
+# p-값 계산
+p_value <- pchisq(chi_squared_stat, df, lower.tail = FALSE)
+
+# 검정 수행 결과
+# p-value가 0.025보다 크기때문에 요일에 관계없이 동일한 것을 확인할 수 있다.
+cat("Chi-squared statistic:", chi_squared_stat, "\n")
+cat("Degrees of freedom:", df, "\n")
+cat("P-value:", p_value, "\n")
+
+# 두 평균으로 검정한 결과
+# 요일별 실제 투입 인원 평균 산출
+day_mean <- as.data.frame(lapply(dat_day, mean))
+# 전체 근무 횟수 당 평균 인원 산출
+day_exp <- rep(sum(dat$team)/(nrow(dat)), length(day_mean))
+day_mean <- rbind(day_mean,day_exp)
+print(day_mean)
+# 검정 수행 결과
+# p-value가 0.025보다 크기때문에 요일에 관계없이 동일한 것을 확인할 수 있다.
+chisq.test(day_mean)
+```
+
+
+<br>
+<br>
+
+#### 8. 초과근무 시간 (over_time)과 성과급 (incentive)이 연관성이 있는지 가설검정을 통하여 확인하고자 한다. 신뢰수준 90%에서 가설검정을 수행하고, 이에 대한 결론을 도출하시오. (15점)
+
+* 이상치를 배제하기 위하여 인센티브는 80, 초과근무는 8000 미만인 대상만 고려할 것
+* 연속형 변수의 경우, 이산화를 진행하여 변수를 처리해주어야 함
+* 검정을 위한 테이블은 5행 5열로 구성할 것
+
+```{r no_8, warning=FALSE}
+# H0: 초과근무시간과 성과급은 서로 연관성이 없다.
+# H1: 초과근무시간과 성과급은 서로 연관성이 있다.
+
+# 두 변수 선택 및 이상치 제거 진행
+two_dat <- subset(dat, incentive < 80,select = c("over_time","incentive"))
+two_dat <- subset(two_dat, over_time < 8000)
+
+# 5행 5열로 구성하기 위해 연속형 변수 이산화 진행
+group <- function(x, bin=5){
+  cut(x, breaks = bin, include.lower=T)
+}
+over <- group(two_dat$over_time)
+inc <- group(two_dat$incentive)
+print(table(over,inc))
+
+chi_test <- chisq.test(table(over,inc))
+# p-value가 0.05보다 작으므로 초과근무시간과 성과급은 서로 연관성이 있음을 확인할 수 있다.
+print(paste('p-value : ',chi_test$p.value))
+```
+
