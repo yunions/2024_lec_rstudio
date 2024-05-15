@@ -1,0 +1,190 @@
+---
+title: '산업공학특론I_10주차_주성분회귀&부분최소제곱회귀_실습'
+author: 'Munwon Lim'
+date: '5/8/2024'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=9, fig.height=9)
+```
+
+<br>
+<br>    
+<br>
+
+
+## [데이터 분석]
+
+(https://www.kaggle.com/datasets/sohommajumder21/appliances-energy-prediction-data-set)
+
+저에너지 건물의 가전제품 에너지 사용량에 관한 회귀 모델을 만들기 위한 실험 데이터
+
+* date: 날짜 (시간 연-월-일 시:분:초)
+* Appliances: 총 에너지 사용량 (Wh)
+* lights: 집안의 조명 장치의 에너지 사용량 (Wh)
+* T1: 주방 온도 (섭씨)
+* RH_1: 주방 습도 (%)
+* T2: 거실 온도 (섭씨)
+* RH_2: 거실 습도 (%)
+* T3: 세탁실 온도 (섭씨)
+* RH_3: 세탁실 습도 (%)
+* T4: 사무실 온도 (섭씨)
+* RH_4: 사무실 습도 (%)
+* T5, 화장실 온도 (섭씨)
+* RH_5, 화장실 습도 (%)
+* T6: 건물 외부 온도 - 북쪽 (섭씨)
+* RH_6, 건물 외부 습도 - 북쪽 (%)
+* T7: 다리미실 온도 (섭씨)
+* RH_7, 다리미실 습도 (%)
+* T8: 십대방 온도 (섭씨)
+* RH_8: 십대방 습도 (%)
+* T9: 부모방 온도 (섭씨)
+* RH_9: 부모방 습도 (%)
+* T_out: 외부 온도 (섭씨)
+* Press_mm_hg: 기압 (mm Hg)
+* RH_out: 외부 습도 (%)
+* Windspeed: 풍속 (m/s)
+* Visibility:가시도 (km)
+* Tdewpoint: 이슬점 (°C)
+
+<br>
+<br>
+<br>
+
+### 1. 데이터 탐색 (EDA) 및 전처리
+
+```{r eda}
+
+dat <- read.csv("산업공학특론I_10주차_실습 데이터.csv")
+head(dat)
+
+
+# 불필요한 변수 제거
+dat <- dat[,-1]
+
+# 단위 통일
+dat <- scale(dat)
+summary(dat)
+
+# Train and Test set
+set.seed(0)
+
+trainidx <- sample(1:nrow(dat), 0.7*nrow(dat))
+train <- dat[trainidx,]
+test <- dat[-trainidx,]
+
+nrow(train);nrow(test)
+```
+
+<br>
+
+### 2. 상관분석
+
+```{r cor}
+
+library(corrplot)
+
+corr <- cor(train, method="pearson")
+
+col <- colorRampPalette(c("red", "skyblue"))
+corrplot(corr, method='color', col = col(200), addCoef.col = 'black',
+         type="upper", tl.cex = 0.75, number.cex = 0.75)
+
+```
+
+<br>
+
+### 3. 일반회귀모형
+
+```{r reg}
+
+library(caret)
+library(Metrics)
+
+colnames(train)
+
+reg <- train(Appliances ~ ., data=train,
+             method="lm", trControl= trainControl(method="cv"))
+
+summary(reg)
+
+# 예측력 평가
+err <- function(actual, pred){
+  result <- c(mae(actual, pred), mse(actual, pred),
+              rmse(actual, pred))
+  names(result) <- c("MAE","MSE","RMSE")
+  print(result)
+}
+
+test <- as.data.frame(test)
+pred_reg <- predict(reg, test)
+err(test$Appliances, pred_reg)
+
+```
+
+
+<br>
+
+### 4. PCR
+
+```{r pcr}
+
+library(pls)
+
+# 모델 수립
+train <- as.data.frame(train)
+pcr_reg <- pcr(Appliances ~., data=train, validation="CV")
+summary(pcr_reg) #6개 주성분이 최적
+
+biplot(pcr_reg)
+
+plot(RMSEP(pcr_reg), legendpos="topright")
+plot(pcr_reg, ncomp=6, line=T)
+plot(pcr_reg, "loadings",ncomp=1:6,legendpos="topright")
+
+pc <- pcr_reg$scores[,1:6]
+train_pc <- cbind(train[,1], pc)
+colnames(train_pc)[1] <- "Appliances"
+
+reg_pc <- train(Appliances ~ ., data=train_pc,
+                method="lm", trControl= trainControl(method="cv"))
+
+summary(reg_pc)
+
+pred_pcr <- predict(pcr_reg, test, ncomp=6)
+err(test$Appliances, pred_pcr)
+```
+
+
+<br>
+
+### 5. PLSR
+
+```{r plsr}
+
+# 모델 수립
+train <- as.data.frame(train)
+plsr_reg <- plsr(Appliances ~., data=train, validation="CV")
+summary(plsr_reg) #6개 주성분이 최적
+
+biplot(plsr_reg)
+
+plot(RMSEP(plsr_reg), legendpos="topright")
+plot(plsr_reg, ncomp=7, line=T)
+plot(plsr_reg, "loadings",ncomp=1:6,legendpos="topright")
+
+lv <- plsr_reg$scores[,1:7]
+train_lv <- cbind(train[,1], lv)
+colnames(train_lv)[1] <- "Appliances"
+
+reg_lv <- train(Appliances ~ ., data=train_lv,
+                method="lm", trControl= trainControl(method="cv"))
+
+summary(reg_lv)
+
+pred_pcr <- predict(plsr_reg, test, ncomp=7)
+err(test$Appliances, pred_pcr)
+
+```
