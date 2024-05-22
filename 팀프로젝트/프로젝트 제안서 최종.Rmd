@@ -42,7 +42,44 @@ library(extrafont)
 - (3) 4A 진폭 방전-diff Voltage : 
 - (4) CC(2A)-2.7V : 2A의 고정 전류로 방전되고 2.7V 도달시 방전 종료
 - (5) Multiple Fixed Load(4A, 1A)-diff Voltage : 
+```{r echo=FALSE}
+library(ggplot2)
+library(gridExtra)
 
+# Function to create individual plots
+create_plot <- function(data, x_range = NULL, hline, title) {
+  if (!is.null(x_range)) {
+    data <- data[x_range[1]:x_range[2], ]
+  }
+  p <- ggplot(data) +
+    geom_line(aes(x = seq_along(Current_measured), y = as.numeric(Current_measured), color = 'Current')) +
+    geom_line(aes(x = seq_along(Voltage_measured), y = as.numeric(Voltage_measured), color = 'Voltage')) +
+    geom_hline(yintercept = hline, color = 'red') +
+    labs(title = title, color = "Legend") +
+    theme_minimal()
+  return(p)
+}
+
+# Example data (replace with your actual data)
+discharge29 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge38 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge25 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge33 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge36 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge41 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+
+# Create the plots
+p1 <- create_plot(discharge29, c(3801, 4400), 2.0, 'CASE A | One Cycle')
+p2 <- create_plot(discharge38, NULL, 2.2, 'CASE B | Whole Cycle')
+p3 <- create_plot(discharge25, c(3911, 4251), 2.0, 'CASE C | One Cycle')
+p4 <- create_plot(discharge33, c(4073, 4152), 2.0, 'CASE D | One Cycle')
+p5 <- create_plot(discharge36, c(4073, 4410), 2.7, 'CASE E | One Cycle')
+p6 <- create_plot(discharge41, NULL, 2.0, 'CASE F | One Cycle')
+
+# Arrange the plots in a 2x3 grid
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3)
+
+```
 
 ```{r echo=FALSE}
 dat29 <- read.csv("experiment/B0029.csv")
@@ -67,7 +104,7 @@ discharge41 <- subset(dat41, cycle_type == 'discharge')
 par(mfrow=c(2, 3))
 
 # Set the overall plot size
-options(repr.plot.width=15, repr.plot.height=8)
+options(repr.plot.width=8, repr.plot.height=15)
 
 # Plot for CASE A
 plot(discharge29[3801:4400,'Current_measured'], type='l', col='blue', 

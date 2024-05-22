@@ -1,0 +1,278 @@
+---
+title: "프로젝트 제안서(기획서)"
+author: "NASA Batttery"
+date: "2024-05-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=9, fig.height=9)
+
+library(extrafont)
+```
+
+<br>
+<br>
+<br>
+
+
+
+## 1. 데이터 설명 및 원본 데이터 요약 결과
+
+### (1) 분석 데이터
+
+- 충전, 방전, 임피던스의 세가지 다른 운영과정을 적용한 리튬 이온 배터리
+
+<br>
+
+### (2) 실험 단계별 데이터 특징
+
+#### 가. 충전과정(2가지 단계)
+
+- (1) 정전류 단계(CC): 배터리는 1.5A의 일정한 전류로 충전되고 배터리의 전압이 4.2V에 도달할 때까지 지속
+
+- (2) 정전압 단계(CV): 배터리 전압이 4.2V에 도달 한 후 전압은 일정하게 유지되고 전류가 20mA로 떨어질 때까지 충전이 지속 
+
+#### 나. 방전과정
+
+- 방전과정은 각 실험마다 유의미하게 차이가 있으며 각 조건은 아래와 같다
+- (1) CC(4A)-diff Voltage : 4A의 고정 전류로 방전되고 각 정해진 전압값 도달시 방전 종료
+- (2) Multiple Load(1A,2A,4A)-diff Voltage : 
+- (3) 4A 진폭 방전-diff Voltage : 
+- (4) CC(2A)-2.7V : 2A의 고정 전류로 방전되고 2.7V 도달시 방전 종료
+- (5) Multiple Fixed Load(4A, 1A)-diff Voltage : 
+```{r echo=FALSE}
+library(ggplot2)
+library(gridExtra)
+
+# Function to create individual plots
+create_plot <- function(data, x_range = NULL, hline, title) {
+  if (!is.null(x_range)) {
+    data <- data[x_range[1]:x_range[2], ]
+  }
+  p <- ggplot(data) +
+    geom_line(aes(x = seq_along(Current_measured), y = as.numeric(Current_measured), color = 'Current')) +
+    geom_line(aes(x = seq_along(Voltage_measured), y = as.numeric(Voltage_measured), color = 'Voltage')) +
+    geom_hline(yintercept = hline, color = 'red') +
+    labs(title = title, color = "Legend") +
+    theme_minimal()
+  return(p)
+}
+
+# Example data (replace with your actual data)
+discharge29 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge38 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge25 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge33 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge36 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+discharge41 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+
+# Create the plots
+p1 <- create_plot(discharge29, c(3801, 4400), 2.0, 'CASE A | One Cycle')
+p2 <- create_plot(discharge38, NULL, 2.2, 'CASE B | Whole Cycle')
+p3 <- create_plot(discharge25, c(3911, 4251), 2.0, 'CASE C | One Cycle')
+p4 <- create_plot(discharge33, c(4073, 4152), 2.0, 'CASE D | One Cycle')
+p5 <- create_plot(discharge36, c(4073, 4410), 2.7, 'CASE E | One Cycle')
+p6 <- create_plot(discharge41, NULL, 2.0, 'CASE F | One Cycle')
+
+# Arrange the plots in a 2x3 grid
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3)
+
+```
+
+```{r echo=FALSE}
+dat29 <- read.csv("experiment/B0029.csv")
+discharge29 <- subset(dat29, cycle_type == 'discharge')
+
+dat38 <- read.csv("experiment/B0038.csv")
+discharge38 <- subset(dat38, cycle_type == 'discharge')
+
+dat25 <- read.csv("experiment/B0025.csv")
+discharge25 <- subset(dat25, cycle_type == 'discharge')
+
+dat33 <- read.csv("experiment/B0033.csv")
+discharge33 <- subset(dat33, cycle_type == 'discharge')
+
+dat36 <- read.csv("experiment/B0036.csv")
+discharge36 <- subset(dat36, cycle_type == 'discharge')
+
+dat41 <- read.csv("experiment/B0041.csv")
+discharge41 <- subset(dat41, cycle_type == 'discharge')
+
+# Create a 2x3 layout for plots
+par(mfrow=c(2, 3))
+
+# Set the overall plot size
+options(repr.plot.width=8, repr.plot.height=15)
+
+# Plot for CASE A
+plot(discharge29[3801:4400,'Current_measured'], type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE A | One Cycle')
+lines(discharge29[3801:4400,'Voltage_measured'], col='red')
+abline(h=2.0, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+
+# Plot for CASE B
+plot(discharge38$Current_measured, type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE B | Whole Cycle')
+lines(discharge38$Voltage_measured, col='red')
+abline(h=2.2, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+
+# Plot for CASE C
+plot(discharge25[3911:4251,'Current_measured'], type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE C | One Cycle')
+lines(discharge25[3911:4251,'Voltage_measured'], col='red')
+abline(h=2.0, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+
+# Plot for CASE D
+plot(discharge33[4073:4152,'Current_measured'], type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE D | One Cycle')
+lines(discharge33[4073:4152,'Voltage_measured'], col='red')
+abline(h=2.0, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+
+# Plot for CASE E
+plot(discharge36[4073:4410,'Current_measured'], type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE E | One Cycle')
+lines(discharge36[4073:4410,'Voltage_measured'], col='red')
+abline(h=2.7, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+
+# Plot for CASE F
+plot(discharge41$Current_measured, type='l', col='blue', 
+     ylab='Current/Voltage', xlab='Index', main='CASE F | Whole Cycle')
+lines(discharge41$Voltage_measured, col='red')
+abline(h=2.0, col='red')
+legend('topright', legend=c('Current', 'Voltage'), col=c('blue', 'red'), lty=1)
+```
+#### 다. 임피던스 측정
+
+- 전기화학 임피던스 분광법(EIS)을 사용하여 0.1Hz에서 5KHz까지의 주파수 스윕을 통해 이루어 지고 이를 통해 배터리 내부의 저항을 평가하여 배터리의 상태와 효율을 이해하는 데 사용
+- 전기회로 형태로 내부 저항의 모습을 도식화 하고 이를 기반으로 임피던스 값을 해석
+- 전류가 흐를 때 회로가 가하는 반발이나 저항을 나타내는 개념이며 사람의 몸 안 상태(근육량, 체지방량, 수분량 등)를 알기 위해 인바디 검사를 하는 것과 유사
+  
+#### 라. 실험 조건
+- 5개의 데이터 군은 각각 방전시키는 전압의 양(2.7V~2.0V)과 실험 온도조건(24°C, 44°C), 실험종료 EOL 기준 값(정적 용량의 30%, 50% 감소 등)등의 실험 조건 차이가 있어 이에 대한 비교 분석이 가능하다.   
+
+|실험조건| 온도  | 운전조건(충전) | 운전조건(방전) | 배터리번호 |
+|:------:|:-----:|-------------------------|--------------------------------------------|:----------:|
+| A      | 43    | 충전 : CC(1.5A)-CV(4.2V)| 방전 : CC(4A)-diff Voltage                 | 29,30,31,32  |
+| B      | 24&44 | 충전 : CC(1.5A)-CV(4.2V)| 방전 : Multiple Load(1A,2A,4A)-diff Voltage| 38,39,40  |
+| C      | 24    | 충전 : CC(1.5A)-CV(4.2V)| 방전 : 4A 진폭 방전-diff Voltage           | 25,26,27,28     |
+| D      | 24    | 충전 : CC(1.5A)-CV(4.2V)| 방전 : CC(4A)-diff Voltage                 | 33,34,36     |
+| E      | 24    | 충전 : CC(1.5A)-CV(4.2V)| 방전 : CC(2A)-2.7V                         | 36     |
+| F      | 4     | 충전 : CC(1.5A)-CV(4.2V)| 방전 : Multiple Fixed Load(4A, 1A)-diff Voltage  | 41,42,43,44     |
+
+<br>
+
+### (3) 원본 데이터 요약 결과
+
+- 원본데이터가 MatFile로 CSV로 변환하여 전처리 진행
+- 데이터 : 사이클링 실험 데이터, 용량 데이터로 분리
+
+#### 가. 11개의 변수 
+
+- Voltage_measured: 측정된 배터리 단자 전압
+- Current_measured: 측정된 배터리 출력 전류
+- Temperature_measured: 측정된 배터리 온도
+- Current_charge: 충전기에서 측정된 전류
+- Voltage_charge: 충전기에서 측정된 전압
+- Time: 주기 동안의 시간 벡터
+- Capacity: 배터리의 용량 (배터리가 지정된 전압까지 방전)
+- Sense_current: 감지 분기의 전류
+- Battery_current: 배터리 분기의 전류
+- Current_ratio: 감지 전류와 배터리 전류의 비율
+- Battery_impedance: 측정된 원시 배터리 임피던스
+- Rectified_impedance: 보정 및 평활화된 배터리 임피던스
+
+<br>
+<br>
+
+## 2. 데이터 분석 목적
+
+- (1) 각 실험 조건에 따른 리튬 이온 배터리의 용량, 임피던스를 기반으로 배터리의 성능 저하 및 수명을 특성 파악
+
+- (2) 리튬 이온 배터리의 용량, 임피던스 및 운영 조건을 활용하여 배터리의 성능 저하 및 수명을 예측
+
+- (3) 열화 패턴을 모델링 및 다중회귀모델을 포함한 통계적 방법을 사용하여 배터리 수명에 영향을 미치는 주요 요인들을 식별하고, 배터리 관리 및 운영 전략에 필요한 데이터 기반의 의사결정 지원
+
+<br>
+<br>
+
+## 3. 데이터 분석 절차
+
+### (1) 데이터 전처리 및 시각화
+
+- 가. 불필요한 데이터 제거, 결측치 처리, 이상치 검출 및 제거
+ 
+- 나. k-fold 교차검증을 통해 train 데이터와 test 데이터로 분할하여 모델 학습 시 사용
+ 
+- 다. 다양한 변수간의 상관관계를 시각화하여 연관성 파악
+ 
+- 라. 연관성이 보이는 변수들을 선택해서 표본상관계수 산출 후 상관분석 실시
+ 
+- 마. 시간에 따른 배터리의 용량(Capacity)의 변화를 시각화하여 열화 패턴 파악
+
+<br>
+
+### (2) 열화모형 추정
+ 
+- 가. 용량(Capacity) 데이터를 활용하여 배터리의 열화모형을 수립
+
+<br>
+
+### (3) 가설검정
+ 
+- 가. 두 가지 이상의 배터리 유형 또는 충전 조건에 대해 수명에 차이가 있는지 분산분석(ANOVA)검정 시행
+ 
+- 나. 수립된 열화 모형이 잘 적합하는지 적합도 검정 시행 
+
+<br>
+
+### (4) 다중회귀모형 학습
+
+- 가. 다양한 운영 조건에 대한 변수들을 기반으로 임피던스값을 추정하는 다중회귀모델 or 성능 저하를 예측하는 다중회귀모델
+
+- 나. 추정된 회귀계수의 유의성 검정
+ 
+- 다. 정규화 회귀분석(Lasso, Elastic Net, Ridge)으로 회귀계수의 크기에 제약을 두어 과대적합 및 과소적합 방지
+
+<br>
+
+### (5) 모델 평가 및 선택
+
+- 가. 회귀모형의 설명번수는 종속변수에 대해 통계적으로 유의미한 설명력을 갖는지 분산분석(ANOVA) 수행
+
+- 나. R^{2}adj을 사용하여 모델의 설명력을 평가
+
+- 다. 변수 선택법(전진선택법, 후진제거법, 단계적 선택법)을 통해 최적의 변수 조합 탐색
+
+- 라. MSE, MAE, RMSE 등을 계산하여 예측 성능 평가
+
+<br>
+
+## 3. 분석 결과물
+1. NASA의 배터리 열화 데이터를 활용하여 리튬 이온 배터리의 수명과 성능 저하를 예측하기 위한 데이터 기반 분석 예정. 
+
+2. 수명 예측 모델: 본 프로젝트는 단순 선형 회귀 및 다중회귀 모델 등 여러 통계적 모형 사용하여 배터리의 수명을 예측할 것. 배터리의 용량 감소와 임피던스 증가 데이터를 토대로 성능 저하를 정량적으로 예측하며, 운영 조건에 따라 이러한 변화를 모델링.
+
+3. 성능 저하 요인 분석: 파생 변수 생성 이후 배터리의 성능 저하에 영향을 미치는 주요 변수들을 식별하여, 이를 통해 배터리 관리 및 유지보수 비용 절감을 위한 최적화 전략 제시. 또한 군 간 분석(ANOVA)를 통해 배터리 유형 및 충전 조건, 실험 조건에 따른 평균 열화시간의 차이가 있는지 살펴 최적의 조건을 제시하며, 군 내 분산 분석을 통해 조건 내에서의 데이터 일관성 검토.
+
+4. 분석 후 선형 회귀 직선을 통해 파생 변수 및 종속 변수 간의 관계가 선형적인지 판단하며, residual plot을 활용하여 데이터의 패턴, 이상치를 체크 예정. 또한 군 간 분석 시 Box plot을 활용하여 데이터의 분포를 살펴 여러 조건들 간의 관계 도식화 예정.
+
+5. 분석 결과에서 얻은 인사이트를 바탕으로 실제 산업 공정에서 배터리의 지속 가능성을 높이고 유지보수 비용을 절감할 수 있는 최적화 된 유지보수 전략 제시.
+
+<br>
+
+## 4. 업무분담
+
+|분석 단계| 비율  | 담당 | 
+|:------:|:-----:|---------
+| 데이터전처리 및 파생변수 생성      | 25    | 나요셉|
+| 데이터분석(가설검정)      | 25    | 김지수|
+| 데이터분석(회귀분석)      | 25    | 김세현|
+| Rmd작성 & 발표      | 25    | 김윤희|
+
