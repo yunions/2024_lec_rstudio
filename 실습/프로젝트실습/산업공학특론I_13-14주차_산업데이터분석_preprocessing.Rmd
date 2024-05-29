@@ -68,30 +68,16 @@ knitr::opts_chunk$set(echo = TRUE)
 * 데이터 전처리 순서 (학습, 테스트셋 분할 전후)를 꼼꼼히 살펴보고 진행할 것
 
 ```{r preprocess}
-library(corrplot)
-library(ggplot2)
-library(caret)
 
-# 데이터 로드 및 전처리
 dat <- read.csv("E:/Course/2024_lec_rstudio/실습/프로젝트실습/산업공학특론I_13-14주차_데이터.csv")
-head(dat)
 
-# stage 1과 stage2로 분리
-stage1_m1 <- grep("Machine1", colnames(dat), value = TRUE)
-stage1_m2 <- grep("Machine2", colnames(dat), value = TRUE)
-stage1_m3 <- grep("Machine3", colnames(dat), value = TRUE)
-stage1_co <- grep("FirstStage", colnames(dat), value = TRUE)
+# timestamp 변수 삭제
+dat <- dat[,-1]
 
-stage2_m4 <- grep("Machine4", colnames(dat), value = TRUE)
-stage2_m5 <- grep("Machine5", colnames(dat), value = TRUE)
-
-print(summary(dat[stage1_m1]))
-print(summary(dat[stage1_m2]))
-print(summary(dat[stage1_m3]))
-print(summary(dat[stage1_co]))
-
-print(summary(dat[stage2_m4]))
-print(summary(dat[stage2_m5]))
+# unique값 적은 변수 살펴보기
+uniqval <- function(x){length(unique(x))} 
+dat_uniq <- apply(dat,2,uniqval)
+apply(dat[,dat_uniq<10], 2, unique) 
 
 # setpoint 관련 변수를 면밀히 조사 
 setidx <- grep('Setpoint', colnames(dat)) 
@@ -107,46 +93,18 @@ apply(dat_set0[,setidx], 2, table) # 0 제외 시 단일값 확인
 
 
 # 이상치 제거 (제거 대신 다른 방법을 쓸 수도 있음)
-uniqval <- function(x){length(unique(x))} 
-dat_uniq <- apply(dat,2,uniqval)
-apply(dat[,dat_uniq<10], 2, unique) 
-
-dat <- dat[dat[,setidx[1]]!=0, ]
+dat <- dat[dat[,setidx[1]]!=0, ] 
+apply(dat[,setidx],2,uniqval)
 
 # Setpoint 변수 삭제
 dat <- dat[,-setidx]
 
-# 각 Stage1, Stage2의 Actual의 평균 산출
-stage1_output <- c()
-stage2_output <- c()
-
-st1 <- c('Stage1.Output')
-st2 <- c('Stage2.Output')
-
-for (i in colnames(dat)) {
-  for (j in st1) {
-    if (grepl(j, i) & grepl('Actual', i)) {
-      stage1_output <- c(stage1_output, i)
-    }
-  }
-  for (j in st2) {
-    if (grepl(j, i) & grepl('Actual', i)) {
-      stage2_output <- c(stage2_output, i)
-    }
-  }
-}
-
-
-stage1_label <- rowMeans(dat[, stage1_output], na.rm = TRUE)
-stage2_label <- rowMeans(dat[, stage2_output], na.rm = TRUE)
-
-dat["stage1_y"] <- stage1_label
-dat["stage2_y"] <- stage2_label
-
-
-# 데이터의 Missing value 확인
-sum_na <- sum(is.na(dat))
-print(sum_na)
+# 다변량 회귀분석이 아닌 관계로 종속변수 평균화
+depidx1 <- grep('Stage1.Output', colnames(dat))
+depidx2 <- grep('Stage2.Output', colnames(dat))
+dat$Stage1_Output <- apply(dat[,depidx1],1,mean)
+dat$Stage2_Output <- apply(dat[,depidx2],1,mean)
+dat <- dat[,-c(depidx1,depidx2)]
 
 # 종속변수 기반 이상치 제거/보정
 library(MASS)
@@ -167,66 +125,54 @@ outlier <- function(target){ # 방법 3) Cook's distance
 } 
 
 ### 1. 이상치 제거
-dat <- dat[!(outlier(dat$stage1_y) & outlier(dat$stage2_y)),]
+dat <- dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),]
 
 ### 2. 이상치 보정 (평균치 또는 중앙값)
-dat[!(outlier(dat$stage1_y) & outlier(dat$stage2_y)),] <- apply(dat[(outlier(dat$stage1_y) & outlier(dat$stage2_y)),],2,mean)
-apply(dat[(outlier(dat$stage1_y) & outlier(dat$stage2_y)),],2,median)
+dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),] <- apply(dat[(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,mean)
+apply(dat[(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,median)
 
 
-# Correlation Matrix 계산
-calculate_cor_matrix <- function(data) {
-  # 표준편차 계산
-  std_devs <- apply(data, 2, sd)
-  
-  # 표준편차가 0인 열 제거 <- 고정값으로 구성된 Stage2 Setpoint 제외
-  data_clean <- data[, std_devs != 0]
-  
-  # 상관계수 행렬 계산
-  cor_matrix <- cor(data_clean)
-  
-  return(cor_matrix)
-}
+# 변수명 변경
+colnames(dat) <- gsub('.C[.]Actual','',colnames(dat))
+colnames(dat) <- gsub('.U[.]Actual','',colnames(dat))
+colnames(dat) <- gsub('[.]','_',colnames(dat))
+colnames(dat) <- gsub('Machine','M',colnames(dat))
+colnames(dat)
 
 
-draw_cor_plot <- function(col_list){
-  
-  i <- c(col_list, "stage1_y", "stage2_y")
-  cor_dat <- calculate_cor_matrix(dat[,i])
-  
-  # 상관계수 행렬 출력
-  print(cor_dat)
-  
-  # 상관계수 행렬 시각화
-  corrplot(cor_dat, method = "circle", tl.cex = 0.5, cl.cex = 0.5,
-           order = "hclust")
-}
-
-draw_cor_plot(stage1_m1)
-draw_cor_plot(stage1_m2)
-draw_cor_plot(stage1_m3)
-draw_cor_plot(stage1_co)
-draw_cor_plot(stage2_m4)
-draw_cor_plot(stage2_m5)
-
-
-col_list <- c(stage1_m1, stage1_m2, stage1_m3, stage1_co, stage2_m4, stage2_m5)
-final_data <- dat[,c(col_list,"stage1_y", "stage2_y")]
-
+# 트레인, 테스트셋 분할
+library(caret)
 set.seed(0)
+trainidx <- sample(1:nrow(dat), 0.7*nrow(dat))
+trainset <- dat[trainidx,]
+testset <- dat[-trainidx,]
 
-trainidx <- sample(1:nrow(final_data), 0.8*nrow(final_data))
-trainset <- final_data[trainidx,]
-testset <- final_data[-trainidx,]
+# 표준화
+depidx <- (ncol(trainset)-1):ncol(trainset)
+scaling <- preProcess(trainset[, -depidx], method = c("center", "scale"))
 
-colnames(trainset)
-scaling <- preProcess(trainset[,-ncol(trainset)],
-                      method = c('center','scale'))
-trainsc <- predict(scaling, trainset[,-ncol(trainset)])
-testsc <- predict(scaling, testset[,-ncol(testset)])
+traintarget <- trainset[,depidx]
+trainsc <- predict(scaling, trainset[, -depidx])
+trainsc <- cbind(trainsc, traintarget)
 
-trainsc$stage1_y <- trainset$stage1_y
-testsc$stage2_y <- testset$stage2_y
+testtarget <- testset[,depidx]
+testsc <- predict(scaling, testset[, -depidx])
+testsc <- cbind(testsc, testtarget)
+
+# 상관분석
+library(corrplot)
+corr <- cor(trainsc)
+col <- colorRampPalette(c('white','blue'))
+corrplot(abs(corr), method='color', col=col(200), type='upper',tl.cex = 0.5, tl.col='black')
+
+# 공정별 데이터셋 정의
+### Stage1의 경우 1차 공정 변수만 활용하기 때문에 별도로 변수 추출
+extract <- function(data, type){
+  if (type==1){ data[,c(1:41,56)] } else if (type==2) { data[,-56] }
+}
+
+trainsc1 <- extract(trainsc,1); trainsc2 <- extract(trainsc,2)
+testsc1 <- extract(testsc,1); testsc2 <- extract(testsc,2)
 
 ```
 
