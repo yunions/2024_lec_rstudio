@@ -70,6 +70,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r preprocess}
 library(corrplot)
 library(ggplot2)
+library(caret)
 
 # 데이터 로드 및 전처리
 dat <- read.csv("E:/Course/2024_lec_rstudio/실습/프로젝트실습/산업공학특론I_13-14주차_데이터.csv")
@@ -141,11 +142,9 @@ calculate_cor_matrix <- function(data) {
 }
 
 
-col_list <- c(stage1_m1, stage1_m2, stage1_m3, stage1_co, stage2_m4, stage2_m5)
-for(i in col_list){
-  # add y value
-  i <- c(i, "stage1_y", "stage2_y")
-  # 함수 사용
+draw_cor_plot <- function(col_list){
+  
+  i <- c(col_list, "stage1_y", "stage2_y")
   cor_dat <- calculate_cor_matrix(dat[,i])
   
   # 상관계수 행렬 출력
@@ -154,22 +153,39 @@ for(i in col_list){
   # 상관계수 행렬 시각화
   corrplot(cor_dat, method = "circle", tl.cex = 0.1, cl.cex = 0.5,
            order = "hclust")
-
 }
-  
+
+draw_cor_plot(stage1_m1)
+draw_cor_plot(stage1_m2)
+draw_cor_plot(stage1_m3)
+draw_cor_plot(stage1_co)
+draw_cor_plot(stage2_m4)
+draw_cor_plot(stage2_m5)
+
+
 # 표준편차가 0인 열
 std_devs <- apply(dat, 2, sd)
 std_0 <- names(std_devs[std_devs == 0])
 print(std_0)
 
+drop_list <- std_0[2:16]
+
+final_data <- dat[,c(col_list,"stage1_y", "stage2_y")]
+
 set.seed(0)
 
+trainidx <- sample(1:nrow(final_data), 0.8*nrow(final_data))
+trainset <- final_data[trainidx,]
+testset <- final_data[-trainidx,]
 
+colnames(trainset)
+scaling <- preProcess(trainset[,-ncol(trainset)],
+                      method = c('center','scale'))
+trainsc <- predict(scaling, trainset[,-ncol(trainset)])
+testsc <- predict(scaling, testset[,-ncol(testset)])
 
-trainidx <- sample(1:nrow(dat), 0.7*nrow(dat))
-train <- dat[trainidx,]
-test <- dat[-trainidx,]
-
+trainsc$stage1_y <- trainset$stage1_y
+testsc$stage2_y <- testset$stage2_y
 
 ```
 
