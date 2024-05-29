@@ -142,6 +142,7 @@ calculate_cor_matrix <- function(data) {
 }
 
 
+
 draw_cor_plot <- function(col_list){
   
   i <- c(col_list, "stage1_y", "stage2_y")
@@ -151,7 +152,7 @@ draw_cor_plot <- function(col_list){
   print(cor_dat)
   
   # 상관계수 행렬 시각화
-  corrplot(cor_dat, method = "circle", tl.cex = 0.1, cl.cex = 0.5,
+  corrplot(cor_dat, method = "circle", tl.cex = 0.5, cl.cex = 0.5,
            order = "hclust")
 }
 
@@ -170,6 +171,7 @@ print(std_0)
 
 drop_list <- std_0[2:16]
 
+col_list <- c(stage1_m1, stage1_m2, stage1_m3, stage1_co, stage2_m4, stage2_m5)
 final_data <- dat[,c(col_list,"stage1_y", "stage2_y")]
 
 set.seed(0)
