@@ -1,5 +1,5 @@
 ---
-title: "프로젝트 제안서(기획서)"
+title: "NASA Battery - Team Project"
 author: "NASA Batttery"
 date: "2024-05-02"
 output: html_document
@@ -42,39 +42,75 @@ library(extrafont)
 - (3) 4A 진폭 방전-diff Voltage : 
 - (4) CC(2A)-2.7V : 2A의 고정 전류로 방전되고 2.7V 도달시 방전 종료
 - (5) Multiple Fixed Load(4A, 1A)-diff Voltage : 
+```{r data load,echo=FALSE}
+dat29 <- read.csv("experiment/B0029.csv")
+discharge29 <- subset(dat29, cycle_type == 'discharge')
+
+dat38 <- read.csv("experiment/B0038.csv")
+discharge38 <- subset(dat38, cycle_type == 'discharge')
+
+dat25 <- read.csv("experiment/B0025.csv")
+discharge25 <- subset(dat25, cycle_type == 'discharge')
+
+dat33 <- read.csv("experiment/B0033.csv")
+discharge33 <- subset(dat33, cycle_type == 'discharge')
+
+dat36 <- read.csv("experiment/B0036.csv")
+discharge36 <- subset(dat36, cycle_type == 'discharge')
+
+dat41 <- read.csv("experiment/B0041.csv")
+discharge41 <- subset(dat41, cycle_type == 'discharge')
+
+ensure_numeric <- function(data, columns) {
+  for (col in columns) {
+    if (!is.numeric(data[[col]])) {
+      data[[col]] <- as.numeric(data[[col]])
+    }
+  }
+  return(data)
+}
+
+discharge29 <- ensure_numeric(discharge29, c('Current_measured', 'Voltage_measured'))
+discharge38 <- ensure_numeric(discharge38, c('Current_measured', 'Voltage_measured'))
+discharge25 <- ensure_numeric(discharge25, c('Current_measured', 'Voltage_measured'))
+discharge33 <- ensure_numeric(discharge33, c('Current_measured', 'Voltage_measured'))
+discharge36 <- ensure_numeric(discharge36, c('Current_measured', 'Voltage_measured'))
+discharge41 <- ensure_numeric(discharge41, c('Current_measured', 'Voltage_measured'))
+
+```
+
 ```{r echo=FALSE}
 library(ggplot2)
 library(gridExtra)
 
-# Function to create individual plots
 create_plot <- function(data, x_range = NULL, hline, title) {
   if (!is.null(x_range)) {
-    data <- data[x_range[1]:x_range[2], ]
+    data <- data[x_range, ]
   }
-  p <- ggplot(data) +
-    geom_line(aes(x = seq_along(Current_measured), y = as.numeric(Current_measured), color = 'Current')) +
-    geom_line(aes(x = seq_along(Voltage_measured), y = as.numeric(Voltage_measured), color = 'Voltage')) +
+  ggplot(data) +
+    geom_line(aes(x = seq_along(Current_measured), y = Current_measured, color = 'Current')) +
+    geom_line(aes(x = seq_along(Voltage_measured), y = Voltage_measured, color = 'Voltage')) +
     geom_hline(yintercept = hline, color = 'red') +
-    labs(title = title, color = "Legend") +
+    labs(title = title, color = '') +
     theme_minimal()
-  return(p)
 }
 
-# Example data (replace with your actual data)
-discharge29 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
-discharge38 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
-discharge25 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
-discharge33 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
-discharge36 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
-discharge41 <- data.frame(Current_measured = rnorm(600), Voltage_measured = rnorm(600))
+# Create each plot
+p1 <- create_plot(discharge29[3801:4400, ], hline = 2.0, title = 'CASE A | One Cycle')
+p2 <- create_plot(discharge38, hline = 2.2, title = 'CASE B | Whole Cycle')
+p3 <- create_plot(discharge25[3911:4251, ], hline = 2.0, title = 'CASE C | One Cycle')
+p4 <- create_plot(discharge33[4073:4152, ], hline = 2.0, title = 'CASE D | One Cycle')
+p5 <- create_plot(discharge36[4073:4410, ], hline = 2.7, title = 'CASE E | One Cycle')
+p6 <- create_plot(discharge41, hline = 2.0, title = 'CASE F | One Cycle')
 
-# Create the plots
-p1 <- create_plot(discharge29, c(3801, 4400), 2.0, 'CASE A | One Cycle')
-p2 <- create_plot(discharge38, NULL, 2.2, 'CASE B | Whole Cycle')
-p3 <- create_plot(discharge25, c(3911, 4251), 2.0, 'CASE C | One Cycle')
-p4 <- create_plot(discharge33, c(4073, 4152), 2.0, 'CASE D | One Cycle')
-p5 <- create_plot(discharge36, c(4073, 4410), 2.7, 'CASE E | One Cycle')
-p6 <- create_plot(discharge41, NULL, 2.0, 'CASE F | One Cycle')
+
+ggplot(discharge29[3801:4400, ]) +
+  geom_line(aes(x = seq_along(Current_measured), y = Current_measured, color = 'Current')) +
+  geom_line(aes(x = seq_along(Voltage_measured), y = Voltage_measured, color = 'Voltage')) +
+  # geom_hline(yintercept = 2.0, color = 'red') +
+  labs(title = "title", color = '') +
+  theme_minimal()
+
 
 # Arrange the plots in a 2x3 grid
 grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3)
