@@ -134,8 +134,8 @@ outlier <- function(target){ # 방법 3) Cook's distance
 dat <- dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),]
 
 ### 2. 이상치 보정 (평균치 또는 중앙값)
-# dat[(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),] <- apply(dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,mean)
-# apply(dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,median)
+dat[(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),] <- apply(dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,mean)
+apply(dat[!(outlier(dat$Stage1_Output) & outlier(dat$Stage2_Output)),],2,median)
 
 
 # 변수명 변경
@@ -172,6 +172,11 @@ corr <- cor(trainsc)
 col <- colorRampPalette(c('white','blue'))
 corrplot(abs(corr), method='color', col=col(200), type='upper',tl.cex = 0.5, tl.col='black')
 
+targetcor <- corr[,ncol(corr)]
+targetcor <- targetcor[targetcor!=1 & abs(targetcor)>0.6]
+# 상관성이 0.6이 이상인 대상이 적어 이를 무시하고 전체 데이터를 대상으로 pca 진행
+data.frame(correlation=targetcor[order(abs(targetcor), decreasing=T)])
+
 # 공정별 데이터셋 정의
 ### Stage1의 경우 1차 공정 변수만 활용하기 때문에 별도로 변수 추출
 extract <- function(data, type){
@@ -192,14 +197,12 @@ testsc1 <- extract(testsc,1); testsc2 <- extract(testsc,2)
 * 신규 변수 또는 축소된 차원으로 효과적인 예측을 수행하기 위한 방안 도출
 
 ```{r feature}
-install.packages("factoextra")
-
 library(factoextra)
 library(ggplot2)
 
-pca <- prcomp(trainsc1 [,], center = TRUE, scale. = TRUE)
 
-stage1_PCA <- pca$x[, 1:3]
+# PCA를 통한 차원 축소
+pca <- prcomp(trainsc1[,1:41], center = TRUE, scale. = TRUE)
 fviz_eig(pca, addlabels = TRUE, ylim = c(0, 50)) + ggtitle("Scree Plot")
 
 
@@ -208,6 +211,22 @@ fviz_pca_ind(pca,
              col.ind = "cos2", # Color by the quality of representation
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              repel = TRUE) + ggtitle("2D PCA Plot")
+
+train1pca <- cbind(pca$x[, 1:5], traintarget[1])
+test1pca <- cbind(predict(pca, testsc1[,1:41])[, 1:5], testtarget[1])
+
+pca <- prcomp(trainsc2[,1:55], center = TRUE, scale. = TRUE)
+fviz_eig(pca, addlabels = TRUE, ylim = c(0, 50)) + ggtitle("Scree Plot")
+
+
+fviz_pca_ind(pca, 
+             geom.ind = "point", 
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE) + ggtitle("2D PCA Plot")
+
+train2pca <- cbind(pca$x[, 1:5], traintarget[2])
+test2pca <- cbind(predict(pca, testsc2[,1:55])[, 1:5], testtarget[2])
 ```
 
 <br>
@@ -225,78 +244,122 @@ library(caret)
 
 library(Metrics)
 
-model1 <- mlp1$finalModel
-model2 <- mlp2$finalModel
-test1 <- testsc1
-test2 <- testsc2
-
-evaluate <- function(model1, model2, test1, test2){
+evaluate <- function(modelnm, model1, model2, test1, test2){
   
   pred1 <- predict(model1, newdata=test1)
+  if (is.matrix(pred1)) {
+    pred1 <- as.vector(pred1)  # 예측 결과를 벡터로 변환
+  }
+  test2$stage1_ouput_exp <- pred1
   pred2 <- predict(model2, newdata=test2)
   
-  print("Stage1")
-  result <- c(mae(pred1, testsc1$Stage1_Output),
+  print(modelnm)
+  result <- c(modelnm,
+              mae(pred1, testsc1$Stage1_Output),
               rmse(pred1, testsc1$Stage1_Output),
-              mse(pred1, testsc1$Stage1_Output))
-  
-  names(result) <- c("MAE","RMSE","MSE")
-  print(result)
-  
-  
-  print("Stage2")
-  result <- c(mae(pred2, testsc2$Stage2_Output),
+              mse(pred1, testsc1$Stage1_Output),
+              mae(pred2, testsc2$Stage2_Output),
               rmse(pred2, testsc2$Stage2_Output),
               mse(pred2, testsc2$Stage2_Output))
   
-  names(result) <- c("MAE","RMSE","MSE")
+  names(result) <- c("Model","Stage1 MAE","Stage1 RMSE","Stage1 MSE",
+                     "Stage2 MAE","Stage2 RMSE","Stage2 MSE")
   print(result)
 }
-evaluate(mlp1$finalModel, mlp2$finalModel, testsc1, testsc2)
 
 
 #Decision Tree
-train_control <- trainControl(method="cv", number=10)
-rpart_control <- rpart.control(maxdepth=6, minsplit=2)
-dt_grid <- expand.grid(.cp=seq(0.01,0.1,by=0.01))
-dt1 <- train(Stage1_Output ~ ., data=trainsc1, method="rpart",
-            trControl=train_control, control=rpart_control,
-            tuneGrid=dt_grid)
+decistion_tree <- function(train1, train2){
 
-using1 <- predict(dt1$finalModel, newdata=trainsc1)
-trainsc2$stage1_ouput_exp <- using1
-dt2 <- train(Stage2_Output ~ ., data=trainsc2, method="rpart",
-            trControl=train_control, control=rpart_control,
-            tuneGrid=dt_grid)
-rpart.plot(dt1$finalModel)
-rpart.plot(dt2$finalModel)
+  train_control <- trainControl(method="cv", number=10)
+  rpart_control <- rpart.control(maxdepth=6, minsplit=2)
+  dt_grid <- expand.grid(.cp=seq(0.01,0.1,by=0.01))
+  #complexity parameter (cp): 가지치기 수행 시 복잡도와 성능을 규제
+  dt1 <- train(Stage1_Output ~ ., data=train1, method="rpart",
+              trControl=train_control, control=rpart_control,
+              tuneGrid=dt_grid)
+  
+  using1 <- predict(dt1$finalModel, newdata=train1)
+  trainsc2$stage1_ouput_exp <- using1
+
+  dt2 <- train(Stage2_Output ~ ., data=train2, method="rpart",
+              trControl=train_control, control=rpart_control,
+              tuneGrid=dt_grid)
+  return(list(dt1,dt2))
+}
+
+dt <- decistion_tree(trainsc1, trainsc2)
+dtpca <- decistion_tree(train1pca, train2pca)
+
+evaluate("dt", dt[[1]], dt[[2]], testsc1, testsc2)
+evaluate("dt pca", dtpca[[1]], dtpca[[2]], test1pca, test2pca)
+
+rpart.plot(dt[[1]]$finalModel)
+rpart.plot(dt[[2]]$finalModel)
 
 
 #SVR
 library(e1071)
-svm_grid <- expand.grid(.C=c(0.1,1,10), .sigma=c(0.01,0.05,0.1))
-svr1 <- train(Stage1_Output ~ ., data=trainsc1, method="svmRadial",
-            trControl=train_control, tuneGrid=svm_grid)
-using1 <- predict(svr1$finalModel, newdata=trainsc1)
-trainsc2$stage1_ouput_exp <- using1
-svr2 <- train(Stage2_Output ~ ., data=trainsc2, method="svmRadial",
-            trControl=train_control, tuneGrid=svm_grid)
 
+support_vector <- function(train1, train2){
+  svm_grid <- expand.grid(.C=c(0.1,1,10), .sigma=c(0.01,0.05,0.1))
+  
+  svr1 <- train(Stage1_Output ~ ., data=train1, method="svmRadial",
+              trControl=train_control, tuneGrid=svm_grid)
+  using1 <- predict(svr1, newdata=train1)
+  trainsc2$stage1_ouput_exp <- using1
+  svr2 <- train(Stage2_Output ~ ., data=train2, method="svmRadial",
+              trControl=train_control, tuneGrid=svm_grid)
+  
+  return(list(svr1,svr2))
+}
+
+svr <- support_vector(trainsc1, trainsc2)
+svrpca <- support_vector(train1pca, train2pca)
 
 #ANN
 library(nnet)
-mlp_gird <- expand.grid(.size=c(1,2,3), .decay=c(0,0.001,0.01))
-mlp1 <- train(Stage1_Output ~ ., data=trainsc1, method="nnet",
-            trControl=train_control, tuneGrid=mlp_gird,
-            linout = T, trace = T)
-using1 <- predict(mlp1$finalModel, newdata=trainsc1)
-trainsc2$stage1_ouput_exp <- using1
-mlp2 <- train(Stage2_Output ~ ., data=trainsc2, method="nnet",
-            trControl=train_control, tuneGrid=mlp_gird,
-            linout = T, trace = T)
-print("MLP")
-using1 <- predict(mlp1$finalModel, newdata=testsc1)
-testsc2$stage1_ouput_exp <- using1
-evaluate(mlp1$finalModel, mlp2$finalModel, testsc1, testsc2)
+multi_perceptron <- function(train1, train2){
+  mlp_gird <- expand.grid(.size=c(1,3,5), .decay=c(0,0.001,0.01))
+  mlp1 <- train(Stage1_Output ~ ., data=train1, method="nnet",
+              trControl=train_control, tuneGrid=mlp_gird,
+              linout = T, trace = T)
+  using1 <- predict(mlp1$finalModel, newdata=train1)
+  if (is.matrix(using1)) {
+    using1 <- as.vector(using1)  # 예측 결과를 벡터로 변환
+  }
+  trainsc2$stage1_ouput_exp <- using1
+  mlp2 <- train(Stage2_Output ~ ., data=train2, method="nnet",
+              trControl=train_control, tuneGrid=mlp_gird,
+              linout = T, trace = T)
+  return(list(mlp1, mlp2))
+} 
 
+mlp <- multi_perceptron(trainsc1, trainsc2)
+mlppca <- multi_perceptron(train1pca, train2pca)
+
+# 적합 모델간 지표 평가
+model_name = c("Decistion Tree","Support Vector","MLP")
+model_list = list(dt, svr, mlp, dtpca, svrpca, mlppca)
+
+results <- list()
+
+for(i in seq_len(3)){
+  model <- model_list[[i]]
+  modelpca <- model_list[[i+3]]
+  eval <- evaluate(model_name[i], model[[1]], model[[2]], testsc1, testsc2)
+  results[[length(results) + 1]] <- eval
+  
+  eval <- evaluate(paste(model_name[i], "pca"), modelpca[[1]], modelpca[[2]], test1pca, test2pca)
+  results[[length(results) + 1]] <- eval
+}
+
+results_df <- do.call(rbind, lapply(results, function(x) as.data.frame(t(x), stringsAsFactors = FALSE)))
+colnames(results_df) <- c("Model", "Stage1_MAE", "Stage1_RMSE", "Stage1_MSE", 
+                          "Stage2_MAE", "Stage2_RMSE", "Stage2_MSE")
+results_df_sorted <- results_df[order(results_df$Stage2_RMSE), ]
+results_df_sorted <- data.frame(Index = seq_len(nrow(results_df_sorted)), results_df_sorted)
+
+# 결과 출력
+print(results_df_sorted)
 ```
