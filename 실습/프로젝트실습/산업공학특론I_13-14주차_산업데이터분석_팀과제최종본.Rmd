@@ -266,6 +266,7 @@ evaluate <- function(modelnm, model1, model2, test1, test2){
   print(result)
 }
 
+train_control <- trainControl(method="cv", number=10)
 
 #Decision Tree
 decistion_tree <- function(train1, train2){
@@ -373,9 +374,9 @@ Model1 <- predict(mlppca[[1]], newdata=test1pca)
 Model2 <- predict(svr[[1]], newdata=testsc1)
 Model3 <- predict(svrpca[[1]], newdata=test1pca)
 
-df_pred <- data.frame(Index = 1:4185, Original = y, Model1 = Model1, Model2 = Model2, Model3 = Model3)
+df_pred <- data.frame(Index = 1:4185, Original = y, MLPpca = Model1, SVR = Model2, SVRpca = Model3)
 
-df_long <- melt(df, id.vars = "Index")
+df_long <- melt(df_pred, id.vars = "Index")
 
 # 플롯 생성
 ggplot(df_long, aes(x = Index, y = value, color = variable)) +
@@ -385,25 +386,24 @@ ggplot(df_long, aes(x = Index, y = value, color = variable)) +
        y = "Value",
        color = "Legend") +
   theme_minimal()
-)
+
+y <- test2pca$Stage2_Output
+Model1 <- predict(mlppca[[2]], newdata=test2pca)
+Model2 <- predict(svr[[2]], newdata=testsc2)
+Model3 <- predict(svrpca[[2]], newdata=test2pca)
+
+df_pred <- data.frame(Index = 1:4185, Original = y, MLPpca = Model1, SVR = Model2, SVRpca = Model3)
+
+df_long <- melt(df_pred, id.vars = "Index")
+
+# 플롯 생성
+ggplot(df_long, aes(x = Index, y = value, color = variable)) +
+  geom_line() +
+  labs(title = "Comparison of Models with Original y",
+       x = "Index",
+       y = "Value",
+       color = "Legend") +
+  theme_minimal()
 
 ```
 
-```{r plotting}
-library(ggplo2t)
-
-
-df_pred <- data.frame(Index = 1:100, Original = y, Model1 = Model1, Model2 = Model2, Model3 = Model3)
-
-# # 데이터 프레임을 롱 포맷으로 변환
-# df_long <- melt(df, id.vars = "Index")
-# 
-# # 플롯 생성
-# ggplot(df_long, aes(x = Index, y = value, color = variable)) +
-#   geom_line() +
-#   labs(title = "Comparison of Models with Original y",
-#        x = "Index",
-#        y = "Value",
-#        color = "Legend") +
-#   theme_minimal()
-# )
