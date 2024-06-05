@@ -241,7 +241,6 @@ test2pca <- cbind(predict(pca, testsc2[,1:55])[, 1:5], testtarget[2])
 library(rpart)
 library(rpart.plot)
 library(caret)
-
 library(Metrics)
 
 evaluate <- function(modelnm, model1, model2, test1, test2){
@@ -362,4 +361,49 @@ results_df_sorted <- data.frame(Index = seq_len(nrow(results_df_sorted)), result
 
 # 결과 출력
 print(results_df_sorted)
+
 ```
+
+```{r plotting}
+library(ggplot2)
+library(reshape2)
+
+y <- test1pca$Stage1_Output
+Model1 <- predict(mlppca[[1]], newdata=test1pca)
+Model2 <- predict(svr[[1]], newdata=testsc1)
+Model3 <- predict(svrpca[[1]], newdata=test1pca)
+
+df_pred <- data.frame(Index = 1:4185, Original = y, Model1 = Model1, Model2 = Model2, Model3 = Model3)
+
+df_long <- melt(df, id.vars = "Index")
+
+# 플롯 생성
+ggplot(df_long, aes(x = Index, y = value, color = variable)) +
+  geom_line() +
+  labs(title = "Comparison of Models with Original y",
+       x = "Index",
+       y = "Value",
+       color = "Legend") +
+  theme_minimal()
+)
+
+```
+
+```{r plotting}
+library(ggplo2t)
+
+
+df_pred <- data.frame(Index = 1:100, Original = y, Model1 = Model1, Model2 = Model2, Model3 = Model3)
+
+# # 데이터 프레임을 롱 포맷으로 변환
+# df_long <- melt(df, id.vars = "Index")
+# 
+# # 플롯 생성
+# ggplot(df_long, aes(x = Index, y = value, color = variable)) +
+#   geom_line() +
+#   labs(title = "Comparison of Models with Original y",
+#        x = "Index",
+#        y = "Value",
+#        color = "Legend") +
+#   theme_minimal()
+# )
